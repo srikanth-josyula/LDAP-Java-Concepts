@@ -1,32 +1,29 @@
 package main.java.ldap;
 
-import java.util.Scanner;
+import javax.naming.NamingException;
+import javax.naming.directory.DirContext;
+
+import main.java.ldap.operations.LdapSearchOperations;
 import main.java.ldap.util.LdapConnectionUtil;
 
 public class MainApp {
-    public static void main(String[] args) {
-        if (LdapConnectionUtil.testConnection()) {
-            System.out.println("LDAP connection successful!");
-            System.out.println("Check if you have access to LDAP");
-            
-            Scanner scanner = new Scanner(System.in);
+	public static void main(String[] args) {
+		DirContext context = null;
+		try {
+			if (LdapConnectionUtil.testConnection()) {
+				System.out.println("LDAP connection successful!");
 
-            System.out.print("Enter your username: ");
-            String username = scanner.nextLine();
+				context = LdapConnectionUtil.createConnection();
 
-            System.out.print("Enter your password: ");
-            String password = scanner.nextLine();
+				// Perform the search operation
+				LdapSearchOperations.searchByUsername(context, "jo");
 
-            scanner.close();
-
-            if (LdapConnectionUtil.authenticateUser(username, password)) {
-                System.out.println("Authentication successful.");
-                // You can start a user session or perform other actions here.
-            } else {
-                System.out.println("Authentication failed.");
-            }
-        } else {
-            System.out.println("LDAP connection failed.");
-        }
-    }
+			} else {
+				System.out.println("LDAP connection failed.");
+			}
+		} catch (NamingException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
 }
