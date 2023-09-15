@@ -1,0 +1,51 @@
+dn: dc=springframework,dc=com
+objectClass: top
+objectClass: domain
+objectclass: extensibleObject
+dc: springframework
+
+dn: ou=groups,dc=springframework,dc=com
+objectclass: top
+objectclass: organizationalUnit
+ou: groups
+
+dn: ou=people,dc=springframework,dc=com
+objectclass: top
+objectclass: organizationalUnit
+ou: people
+
+dn: uid=testuser1,dc=springframework,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+cn: Test User1
+sn: User1
+uid: testuser1
+userPassword: test
+
+dn: uid=testuser2,dc=springframework,dc=com
+objectClass: top
+objectClass: person
+objectClass: organizationalPerson
+objectClass: inetOrgPerson
+cn: Test Use2
+sn: User2
+uid: testuser2
+userPassword: test
+
+# Adding users to groups
+dn: cn=users,ou=groups,dc=springframework,dc=com
+objectclass: top
+objectclass: groupOfUniqueNames
+cn: users
+ou: user
+uniqueMember: uid=testuser2,ou=people,dc=springframework,dc=com
+uniqueMember: uid=testuser1,ou=people,dc=springframework,dc=com
+
+dn: cn=admins,ou=groups,dc=springframework,dc=com
+objectclass: top
+objectclass: groupOfUniqueNames
+cn: admins
+ou: admin
+uniqueMember: uid=testuser1,ou=people,dc=springframework,dc=com

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" xmlns:th="http://www.thymeleaf.org">
+   <head th:fragment="footer">
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+      <style>
+         /* Add custom CSS styles here */
+         .navbar {
+         background-color: black;
+         }
+         .navbar-dark .navbar-nav .nav-link {
+         color: white !important;
+         }
+         .navbar-dark .navbar-toggler-icon {
+         background-color: white;
+         }
+         .footer {
+         background-color: black;
+         color: white;
+         padding: 20px 0;
+         position: absolute;
+         bottom: 0;
+         width: 100%;
+         }
+      </style>
+   </head>
+   <body>
+      <div th:fragment="footer">
+         <div class="footer text-center">
+            &copy; 2023 Srikanth Josyula. All rights reserved.
+         </div>
+      </div>
+   </body>
+</html>

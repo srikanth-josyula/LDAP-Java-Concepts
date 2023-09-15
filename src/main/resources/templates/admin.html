@@ -1,0 +1,25 @@
+<!DOCTYPE HTML>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Spring Boot Thymeleaf + Spring Security</title>
+</head>
+<body>
+<div th:replace="fragments/header :: header"/> </div>
+<div class="container">
+</br></br>
+		<h2>Admin Page (Spring Security SAML Protected)</h2>
+		<h3>Logged in Successfully from IDP</h3>
+		</br></br>
+        <h2 th:inline="text">Hello '<span sec:authentication="name"></span>'!</h2>
+        <h3>Your authorities are '<span sec:authentication="authorities"></span>'.</h3>
+        </br>
+        <h2>All Your Attributes</h2>
+		<dl th:each="userAttribute : ${userAttributes}">
+			<dt th:text="${userAttribute.key}"></dt>
+			<dd th:text="${userAttribute.value}"></dd>
+		</dl>
+       
+</div>
+<div th:replace="fragments/footer :: footer"/> </div>
+</body>
+</html>
