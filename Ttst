@@ -1,44 +1,46 @@
-import java.io.*;
-import java.util.List;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
+import com.opencsv.CSVReader;
+import com.opencsv.CSVWriter;
 
-public class ReadUpdateCSVFast {
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Arrays;
+import java.util.concurrent.atomic.AtomicReferenceArray;
+
+public class ParallelCSVProcessing {
     public static void main(String[] args) {
-        String csvFilePath = "/path/to/your/large_file.csv"; // Replace with the actual path to your CSV
+        String inputFilePath = "input.csv"; // Replace with the path to your input CSV file
+        String outputFilePath = "output.csv"; // Replace with the desired output file path
 
-        try (BufferedReader br = new BufferedReader(new FileReader(csvFilePath))) {
-            List<String> lines = br.lines().collect(Collectors.toList());
-            AtomicLong lineNumber = new AtomicLong(0);
+        try (CSVReader reader = new CSVReader(new FileReader(inputFilePath));
+             CSVWriter writer = new CSVWriter(new FileWriter(outputFilePath))) {
 
-            // Create a StringBuilder to build the modified CSV data
-            StringBuilder modifiedCsvData = new StringBuilder();
+            // Read the header from the input CSV and add a new column for "Status"
+            String[] header = reader.readNext();
+            String[] newHeader = addColumn(header, "Status");
+            writer.writeNext(newHeader);
 
-            lines.forEach(line -> {
-                String[] columns = line.split(","); // Assuming CSV columns are separated by commas
-                if (columns.length >= 2) {
-                    String nodeID = columns[0].trim();
-                    String nodeDescription = columns[1].trim();
-
-                    // Add your logic to calculate the new column value
-                    String newColumnValue = "NewValue";
-
-                    // Append the new column value to the line
-                    modifiedCsvData.append(nodeID).append(",").append(nodeDescription).append(",").append(newColumnValue).append("\n");
-                } else {
-                    // Handle lines with insufficient columns here
-                }
+            // Process rows in parallel
+            reader.parallelStream().forEach(row -> {
+                // Process each row here, you can modify and add data as needed
+                String[] processedRow = processRow(row);
+                writer.writeNext(processedRow);
             });
-
-            // Write the modified CSV data back to the same file
-            try (BufferedWriter bw = new BufferedWriter(new FileWriter(csvFilePath))) {
-                bw.write(modifiedCsvData.toString());
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
 
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    private static String[] addColumn(String[] row, String columnName) {
+        String[] newRow = Arrays.copyOf(row, row.length + 1);
+        newRow[row.length] = columnName;
+        return newRow;
+    }
+
+    private static String[] processRow(String[] row) {
+        // Process the row here and return the modified row with the "Status" column
+        String status = "Done"; // Replace with your logic to determine the status
+        return addColumn(row, status);
     }
 }
