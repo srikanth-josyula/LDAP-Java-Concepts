@@ -1,69 +1,56 @@
-import org.springframework.extensions.webscripts.*;
-import org.alfresco.service.cmr.repository.NodeService;
-import org.alfresco.service.cmr.repository.StoreRef;
-import org.alfresco.service.cmr.repository.NodeRef;
-import org.alfresco.service.ServiceRegistry;
+import com.opencsv.CSVReader;
+import com.opencsv.CSVWriter;
+import com.opencsv.exceptions.CsvValidationException;
 
-import java.io.BufferedReader;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
-import java.io.Writer;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.List;
-import java.util.stream.Collectors;
 
-public class UpdateNodesWebScript extends AbstractWebScript {
+public class ProcessCSV {
+    public static void main(String[] args) throws IOException, CsvValidationException {
+        // Input CSV file path
+        String inputFile = "input.csv";
 
-    private ServiceRegistry serviceRegistry;
+        // Output CSV file path
+        String outputFile = "output.csv";
 
-    public void setServiceRegistry(ServiceRegistry serviceRegistry) {
-        this.serviceRegistry = serviceRegistry;
+        // Initialize CSV reader and writer
+        CSVReader reader = new CSVReader(new FileReader(inputFile));
+        CSVWriter writer = new CSVWriter(new FileWriter(outputFile));
+
+        // Read the header and add a new header column for status
+        String[] header = reader.readNext();
+        String[] newHeader = new String[header.length + 1];
+        System.arraycopy(header, 0, newHeader, 0, header.length);
+        newHeader[header.length] = "Status";
+        writer.writeNext(newHeader);
+
+        String[] row;
+        while ((row = reader.readNext()) != null) {
+            // Process your data here; for demonstration purposes, we'll just print it
+            System.out.println("Processing Row: " + row[0] + ", " + row[1]);
+
+            // Your processing logic goes here
+            boolean success = processRow(row[0], row[1]); // Replace with your actual processing logic
+
+            // Add the status (success or failed) to the row
+            String[] newRow = new String[row.length + 1];
+            System.arraycopy(row, 0, newRow, 0, row.length);
+            newRow[row.length] = success ? "Success" : "Failed";
+
+            // Write the processed row to the output CSV
+            writer.writeNext(newRow);
+        }
+
+        // Close the reader and writer
+        reader.close();
+        writer.close();
     }
 
-    @Override
-    public void execute(WebScriptRequest req, WebScriptResponse res) throws IOException {
-        String csvFilePath = "/path/to/your/large_file.csv"; // Replace with the actual server path to your CSV file
-
-        res.setContentType("text/plain"); // Set the response content type
-
-        NodeService nodeService = serviceRegistry.getNodeService();
-        StoreRef storeRef = new StoreRef(StoreRef.PROTOCOL_WORKSPACE, "SpacesStore");
-
-        try (BufferedReader br = new BufferedReader(new FileReader(csvFilePath));
-             Writer writer = res.getWriter()) {
-
-            List<String> lines = br.lines().collect(Collectors.toList());
-            AtomicLong lineNumber = new AtomicLong(0);
-
-            lines.parallelStream().forEach(line -> {
-                String[] columns = line.split(","); // Assuming CSV columns are separated by commas
-
-                if (columns.length >= 2) {
-                    String nodeId = columns[0].trim();
-                    String nodeDescription = columns[1].trim();
-
-                    try {
-                        // Retrieve the NodeRef based on the Node ID (assuming a specific location)
-                        NodeRef nodeRef = new NodeRef(storeRef, nodeId);
-
-                        // Check if the node exists before updating
-                        if (nodeService.exists(nodeRef)) {
-                            // Update the node with the new description
-                            nodeService.setProperty(nodeRef, "cm:description", nodeDescription);
-                            nodeService.saveNode(nodeRef);
-                            writer.write("Node updated: " + nodeId + "\n");
-                        } else {
-                            writer.write("Node not found: " + nodeId + "\n");
-                        }
-                    } catch (Exception e) {
-                        writer.write("Error updating Node ID " + nodeId + ": " + e.getMessage() + "\n");
-                    }
-                } else {
-                    writer.write("Invalid CSV row: " + line + "\n");
-                }
-            });
-        } catch (IOException e) {
-            throw new WebScriptException("Error reading CSV file: " + e.getMessage());
-        }
+    // Replace this method with your actual processing logic
+    private static boolean processRow(String column1, String column2) {
+        // Example: You can implement your processing logic here
+        // For this example, we'll consider it successful if column1 is not empty.
+        return !column1.isEmpty();
     }
 }
