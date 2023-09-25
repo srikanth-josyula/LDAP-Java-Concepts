@@ -9,30 +9,28 @@ public class EditExistingRowsInCSV {
         String filePath = "input_and_output.csv";
 
         // Create a CSV parser and writer
-        CSVParser csvParser = new CSVParserBuilder().withSeparator(',').withIgnoreQuotations(false).build();
+        CSVParser csvParser = CSVParser.parse(new File(filePath), Charset.defaultCharset(), CSVFormat.DEFAULT);
         CSVPrinter csvPrinter = new CSVPrinter(new FileWriter(filePath), CSVFormat.DEFAULT);
 
         // Read the CSV file and process it
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            CSVRecord header = csvParser.parse(br).getRecords().get(0);
+        List<CSVRecord> records = csvParser.getRecords();
+        CSVRecord header = records.get(0);
 
-            // Add the "Status" header if it doesn't exist
-            if (!header.toString().contains("Status")) {
-                csvPrinter.printRecord(header.toMap().keySet().toArray(new String[0]), "Status");
-            }
+        // Add the "Status" header if it doesn't exist
+        if (!header.toString().contains("Status")) {
+            csvPrinter.printRecord(header.toMap().keySet().toArray(new String[0]), "Status");
+        }
 
-            String line;
-            while ((line = br.readLine()) != null) {
-                CSVRecord record = csvParser.parse(line, header);
-                // Process your data here; for demonstration purposes, we'll just print it
-                System.out.println("Processing Row: " + record.get(0) + ", " + record.get(1));
+        for (int i = 1; i < records.size(); i++) {
+            CSVRecord record = records.get(i);
+            // Process your data here; for demonstration purposes, we'll just print it
+            System.out.println("Processing Row: " + record.get(0) + ", " + record.get(1));
 
-                // Your processing logic goes here
-                boolean success = processRow(record.get(0), record.get(1)); // Replace with your actual processing logic
+            // Your processing logic goes here
+            boolean success = processRow(record.get(0), record.get(1)); // Replace with your actual processing logic
 
-                // Add the status (success or failed) to the row
-                csvPrinter.printRecord(record.toMap().values().toArray(new String[0]), success ? "Success" : "Failed");
-            }
+            // Add the status (success or failed) to the row
+            csvPrinter.printRecord(record.toMap().values().toArray(new String[0]), success ? "Success" : "Failed");
         }
 
         // Close the parser and writer
