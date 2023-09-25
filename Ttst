@@ -1,6 +1,7 @@
 import org.apache.commons.csv.*;
 
 import java.io.*;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 public class EditExistingRowsInCSV {
@@ -9,7 +10,7 @@ public class EditExistingRowsInCSV {
         String filePath = "input_and_output.csv";
 
         // Create a CSV parser and writer
-        CSVParser csvParser = CSVParser.parse(new File(filePath), Charset.defaultCharset(), CSVFormat.DEFAULT);
+        CSVParser csvParser = CSVParser.parse(new File(filePath), StandardCharsets.UTF_8, CSVFormat.DEFAULT);
         CSVPrinter csvPrinter = new CSVPrinter(new FileWriter(filePath), CSVFormat.DEFAULT);
 
         // Read the CSV file and process it
