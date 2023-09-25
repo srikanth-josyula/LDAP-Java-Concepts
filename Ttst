@@ -1,42 +1,44 @@
-import com.opencsv.CSVReader;
-import com.opencsv.CSVWriter;
-
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.ArrayList;
+import java.io.*;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.stream.Collectors;
 
-public class CsvFileManipulation {
+public class ReadUpdateCSVFast {
     public static void main(String[] args) {
-        String inputFile = "your_file.csv"; // Replace with your CSV file
+        String csvFilePath = "/path/to/your/large_file.csv"; // Replace with the actual path to your CSV
 
-        try (CSVReader reader = new CSVReader(new FileReader(inputFile));
-             CSVWriter writer = new CSVWriter(new FileWriter(inputFile))) {
+        try (BufferedReader br = new BufferedReader(new FileReader(csvFilePath))) {
+            List<String> lines = br.lines().collect(Collectors.toList());
+            AtomicLong lineNumber = new AtomicLong(0);
 
-            List<String[]> lines = reader.readAll();
+            // Create a StringBuilder to build the modified CSV data
+            StringBuilder modifiedCsvData = new StringBuilder();
 
-            // Add a new column header
-            String[] header = lines.get(0);
-            header = addNewColumn(header, "NewColumn");
+            lines.forEach(line -> {
+                String[] columns = line.split(","); // Assuming CSV columns are separated by commas
+                if (columns.length >= 2) {
+                    String nodeID = columns[0].trim();
+                    String nodeDescription = columns[1].trim();
 
-            // Add data to the new column
-            for (int i = 1; i < lines.size(); i++) {
-                String[] line = lines.get(i);
-                line = addNewColumn(line, "NewData" + i); // Replace with your data
+                    // Add your logic to calculate the new column value
+                    String newColumnValue = "NewValue";
+
+                    // Append the new column value to the line
+                    modifiedCsvData.append(nodeID).append(",").append(nodeDescription).append(",").append(newColumnValue).append("\n");
+                } else {
+                    // Handle lines with insufficient columns here
+                }
+            });
+
+            // Write the modified CSV data back to the same file
+            try (BufferedWriter bw = new BufferedWriter(new FileWriter(csvFilePath))) {
+                bw.write(modifiedCsvData.toString());
+            } catch (IOException e) {
+                e.printStackTrace();
             }
 
-            // Write the modified data back to the same CSV file
-            writer.writeAll(lines);
         } catch (IOException e) {
             e.printStackTrace();
         }
-    }
-
-    private static String[] addNewColumn(String[] row, String newData) {
-        String[] newRow = new String[row.length + 1];
-        System.arraycopy(row, 0, newRow, 0, row.length);
-        newRow[row.length] = newData;
-        return newRow;
     }
 }
