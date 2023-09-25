@@ -6,24 +6,25 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
-public class ProcessCSV {
+public class ProcessCSVInPlace {
     public static void main(String[] args) throws IOException, CsvValidationException {
-        // Input CSV file path
-        String inputFile = "input.csv";
-
-        // Output CSV file path
-        String outputFile = "output.csv";
+        // Input and output CSV file path (same file)
+        String filePath = "input_and_output.csv";
 
         // Initialize CSV reader and writer
-        CSVReader reader = new CSVReader(new FileReader(inputFile));
-        CSVWriter writer = new CSVWriter(new FileWriter(outputFile));
+        CSVReader reader = new CSVReader(new FileReader(filePath));
+        CSVWriter writer = new CSVWriter(new FileWriter(filePath, true)); // Append mode
 
         // Read the header and add a new header column for status
         String[] header = reader.readNext();
         String[] newHeader = new String[header.length + 1];
         System.arraycopy(header, 0, newHeader, 0, header.length);
         newHeader[header.length] = "Status";
-        writer.writeNext(newHeader);
+
+        // Write the new header (if it hasn't been added already)
+        if (header.length == newHeader.length - 1) {
+            writer.writeNext(newHeader);
+        }
 
         String[] row;
         while ((row = reader.readNext()) != null) {
@@ -38,7 +39,7 @@ public class ProcessCSV {
             System.arraycopy(row, 0, newRow, 0, row.length);
             newRow[row.length] = success ? "Success" : "Failed";
 
-            // Write the processed row to the output CSV
+            // Overwrite the processed row in the same file
             writer.writeNext(newRow);
         }
 
