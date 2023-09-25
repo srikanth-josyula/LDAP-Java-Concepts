@@ -4,13 +4,17 @@ import com.opencsv.CSVWriter;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.Arrays;
-import java.util.concurrent.atomic.AtomicReferenceArray;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 public class ParallelCSVProcessing {
     public static void main(String[] args) {
         String inputFilePath = "input.csv"; // Replace with the path to your input CSV file
         String outputFilePath = "output.csv"; // Replace with the desired output file path
+
+        int numThreads = Runtime.getRuntime().availableProcessors(); // Use available CPU cores
+        ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
 
         try (CSVReader reader = new CSVReader(new FileReader(inputFilePath));
              CSVWriter writer = new CSVWriter(new FileWriter(outputFilePath))) {
@@ -20,27 +24,25 @@ public class ParallelCSVProcessing {
             String[] newHeader = addColumn(header, "Status");
             writer.writeNext(newHeader);
 
-            // Process rows in parallel
-            reader.parallelStream().forEach(row -> {
-                // Process each row here, you can modify and add data as needed
-                String[] processedRow = processRow(row);
-                writer.writeNext(processedRow);
-            });
+            String[] nextLine;
+            while ((nextLine = reader.readNext()) != null) {
+                final String[] row = nextLine;
+                executorService.submit(() -> {
+                    // Process each row here, you can modify and add data as needed
+                    String[] processedRow = processRow(row);
+                    writer.writeNext(processedRow);
+                });
+            }
 
-        } catch (IOException e) {
+            executorService.shutdown();
+            executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+
+        } catch (IOException | InterruptedException e) {
             e.printStackTrace();
         }
     }
 
     private static String[] addColumn(String[] row, String columnName) {
-        String[] newRow = Arrays.copyOf(row, row.length + 1);
-        newRow[row.length] = columnName;
-        return newRow;
-    }
-
-    private static String[] processRow(String[] row) {
-        // Process the row here and return the modified row with the "Status" column
-        String status = "Done"; // Replace with your logic to determine the status
-        return addColumn(row, status);
-    }
-}
+        String[] newRow = new String[row.length + 1];
+        System.arraycopy(row, 0, newRow, 0, row.length);
+        newRow[row
