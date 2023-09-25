@@ -1,51 +1,43 @@
-import com.opencsv.CSVReader;
-import com.opencsv.CSVWriter;
-import com.opencsv.exceptions.CsvValidationException;
+import org.apache.commons.csv.*;
 
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
+import java.io.*;
+import java.util.List;
 
-public class ProcessCSVInPlace {
-    public static void main(String[] args) throws IOException, CsvValidationException {
-        // Input and output CSV file path (same file)
+public class EditExistingRowsInCSV {
+    public static void main(String[] args) throws IOException {
+        // CSV file path (same file)
         String filePath = "input_and_output.csv";
 
-        // Initialize CSV reader and writer
-        CSVReader reader = new CSVReader(new FileReader(filePath));
-        CSVWriter writer = new CSVWriter(new FileWriter(filePath, true)); // Append mode
+        // Create a CSV parser and writer
+        CSVParser csvParser = new CSVParserBuilder().withSeparator(',').withIgnoreQuotations(false).build();
+        CSVPrinter csvPrinter = new CSVPrinter(new FileWriter(filePath), CSVFormat.DEFAULT);
 
-        // Read the header and add a new header column for status
-        String[] header = reader.readNext();
-        String[] newHeader = new String[header.length + 1];
-        System.arraycopy(header, 0, newHeader, 0, header.length);
-        newHeader[header.length] = "Status";
+        // Read the CSV file and process it
+        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+            CSVRecord header = csvParser.parse(br).getRecords().get(0);
 
-        // Write the new header (if it hasn't been added already)
-        if (header.length == newHeader.length - 1) {
-            writer.writeNext(newHeader);
+            // Add the "Status" header if it doesn't exist
+            if (!header.toString().contains("Status")) {
+                csvPrinter.printRecord(header.toMap().keySet().toArray(new String[0]), "Status");
+            }
+
+            String line;
+            while ((line = br.readLine()) != null) {
+                CSVRecord record = csvParser.parse(line, header);
+                // Process your data here; for demonstration purposes, we'll just print it
+                System.out.println("Processing Row: " + record.get(0) + ", " + record.get(1));
+
+                // Your processing logic goes here
+                boolean success = processRow(record.get(0), record.get(1)); // Replace with your actual processing logic
+
+                // Add the status (success or failed) to the row
+                csvPrinter.printRecord(record.toMap().values().toArray(new String[0]), success ? "Success" : "Failed");
+            }
         }
 
-        String[] row;
-        while ((row = reader.readNext()) != null) {
-            // Process your data here; for demonstration purposes, we'll just print it
-            System.out.println("Processing Row: " + row[0] + ", " + row[1]);
-
-            // Your processing logic goes here
-            boolean success = processRow(row[0], row[1]); // Replace with your actual processing logic
-
-            // Add the status (success or failed) to the row
-            String[] newRow = new String[row.length + 1];
-            System.arraycopy(row, 0, newRow, 0, row.length);
-            newRow[row.length] = success ? "Success" : "Failed";
-
-            // Overwrite the processed row in the same file
-            writer.writeNext(newRow);
-        }
-
-        // Close the reader and writer
-        reader.close();
-        writer.close();
+        // Close the parser and writer
+        csvParser.close();
+        csvPrinter.close();
     }
 
     // Replace this method with your actual processing logic
