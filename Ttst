@@ -1,48 +1,42 @@
-import org.apache.commons.csv.*;
+import com.opencsv.CSVReader;
+import com.opencsv.CSVWriter;
 
-import java.io.*;
-import java.nio.charset.StandardCharsets;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
-public class EditExistingRowsInCSV {
-    public static void main(String[] args) throws IOException {
-        // CSV file path (same file)
-        String filePath = "input_and_output.csv";
+public class CsvFileManipulation {
+    public static void main(String[] args) {
+        String inputFile = "your_file.csv"; // Replace with your CSV file
 
-        // Create a CSV parser and writer
-        CSVParser csvParser = CSVParser.parse(new File(filePath), StandardCharsets.UTF_8, CSVFormat.DEFAULT);
-        CSVPrinter csvPrinter = new CSVPrinter(new FileWriter(filePath), CSVFormat.DEFAULT);
+        try (CSVReader reader = new CSVReader(new FileReader(inputFile));
+             CSVWriter writer = new CSVWriter(new FileWriter(inputFile))) {
 
-        // Read the CSV file and process it
-        List<CSVRecord> records = csvParser.getRecords();
-        CSVRecord header = records.get(0);
+            List<String[]> lines = reader.readAll();
 
-        // Add the "Status" header if it doesn't exist
-        if (!header.toString().contains("Status")) {
-            csvPrinter.printRecord(header.toMap().keySet().toArray(new String[0]), "Status");
+            // Add a new column header
+            String[] header = lines.get(0);
+            header = addNewColumn(header, "NewColumn");
+
+            // Add data to the new column
+            for (int i = 1; i < lines.size(); i++) {
+                String[] line = lines.get(i);
+                line = addNewColumn(line, "NewData" + i); // Replace with your data
+            }
+
+            // Write the modified data back to the same CSV file
+            writer.writeAll(lines);
+        } catch (IOException e) {
+            e.printStackTrace();
         }
-
-        for (int i = 1; i < records.size(); i++) {
-            CSVRecord record = records.get(i);
-            // Process your data here; for demonstration purposes, we'll just print it
-            System.out.println("Processing Row: " + record.get(0) + ", " + record.get(1));
-
-            // Your processing logic goes here
-            boolean success = processRow(record.get(0), record.get(1)); // Replace with your actual processing logic
-
-            // Add the status (success or failed) to the row
-            csvPrinter.printRecord(record.toMap().values().toArray(new String[0]), success ? "Success" : "Failed");
-        }
-
-        // Close the parser and writer
-        csvParser.close();
-        csvPrinter.close();
     }
 
-    // Replace this method with your actual processing logic
-    private static boolean processRow(String column1, String column2) {
-        // Example: You can implement your processing logic here
-        // For this example, we'll consider it successful if column1 is not empty.
-        return !column1.isEmpty();
+    private static String[] addNewColumn(String[] row, String newData) {
+        String[] newRow = new String[row.length + 1];
+        System.arraycopy(row, 0, newRow, 0, row.length);
+        newRow[row.length] = newData;
+        return newRow;
     }
 }
