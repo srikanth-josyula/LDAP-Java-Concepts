@@ -45,4 +45,13 @@ public class ParallelCSVProcessing {
     private static String[] addColumn(String[] row, String columnName) {
         String[] newRow = new String[row.length + 1];
         System.arraycopy(row, 0, newRow, 0, row.length);
-        newRow[row
+        newRow[row.length] = columnName;
+        return newRow;
+    }
+
+    private static String[] processRow(String[] row) {
+        // Process the row here and return the modified row with the "Status" column
+        String status = "Done"; // Replace with your logic to determine the status
+        return addColumn(row, status);
+    }
+}
