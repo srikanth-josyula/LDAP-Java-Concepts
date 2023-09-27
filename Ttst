@@ -1,57 +1,166 @@
-import com.opencsv.CSVReader;
-import com.opencsv.CSVWriter;
+package com.testing;
 
+import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.FilenameFilter;
 import java.io.IOException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.Date;
 import java.util.concurrent.TimeUnit;
 
+import com.opencsv.CSVReader;
+import com.opencsv.CSVWriter;
+import com.opencsv.exceptions.CsvValidationException;
+
 public class ParallelCSVProcessing {
-    public static void main(String[] args) {
-        String inputFilePath = "input.csv"; // Replace with the path to your input CSV file
-        String outputFilePath = "output.csv"; // Replace with the desired output file path
 
-        int numThreads = Runtime.getRuntime().availableProcessors(); // Use available CPU cores
-        ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
+	private static final String SOURCE_CSV_LOC = "C:/Application/Utilities/EK-7424-EDGE-EFS/reports";
+	private static final String ARCHIVE_CSV_LOC_NAME = "archive";
+	private static final String SUCCESS_CSV_LOC_NAME = "success";
+	private static final String ERROR_CSV_LOC_NAME = "error";
 
-        try (CSVReader reader = new CSVReader(new FileReader(inputFilePath));
-             CSVWriter writer = new CSVWriter(new FileWriter(outputFilePath))) {
+	public static void main(String[] args) {
 
-            // Read the header from the input CSV and add a new column for "Status"
-            String[] header = reader.readNext();
-            String[] newHeader = addColumn(header, "Status");
-            writer.writeNext(newHeader);
+		long startTime = System.currentTimeMillis();
+		SimpleDateFormat dateFormat = new SimpleDateFormat("E yyyy.MM.dd 'at' hh:mm:ss a zzz");
+		System.out.println("Report Generation Started at " + dateFormat.format(new Date()));
 
-            String[] nextLine;
-            while ((nextLine = reader.readNext()) != null) {
-                final String[] row = nextLine;
-                executorService.submit(() -> {
-                    // Process each row here, you can modify and add data as needed
-                    String[] processedRow = processRow(row);
-                    writer.writeNext(processedRow);
-                });
-            }
+		File[] csvFiles = getCSVReports(SOURCE_CSV_LOC);
+		int numFilestoPick = Math.min(2, csvFiles.length);
 
-            executorService.shutdown();
-            executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+		for (int i = csvFiles.length - 1; i >= csvFiles.length - numFilestoPick; i--) {
 
-        } catch (IOException | InterruptedException e) {
-            e.printStackTrace();
-        }
-    }
+			boolean hasAnyFailures = false;
+			File csvFile = csvFiles[i];
+			String inputFilePath = csvFile.getAbsolutePath();
 
-    private static String[] addColumn(String[] row, String columnName) {
-        String[] newRow = new String[row.length + 1];
-        System.arraycopy(row, 0, newRow, 0, row.length);
-        newRow[row.length] = columnName;
-        return newRow;
-    }
+			String successFilePath = SOURCE_CSV_LOC + "/" + SUCCESS_CSV_LOC_NAME + "/" + csvFile.getName();
+			String failureFilePath = SOURCE_CSV_LOC + "/" + ERROR_CSV_LOC_NAME + "/" + csvFile.getName();
 
-    private static String[] processRow(String[] row) {
-        // Process the row here and return the modified row with the "Status" column
-        String status = "Done"; // Replace with your logic to determine the status
-        return addColumn(row, status);
-    }
+			// int numThreads = Runtime.getRuntime().availableProcessors();
+			// ExecutorService executorService = Executors.newFixedThreadPool(numThreads);
+			CSVReader reader = null;
+			CSVWriter successFilewriter = null;
+			CSVWriter failureFilewriter = null;
+			try {
+
+				reader = new CSVReader(new FileReader(inputFilePath));
+				successFilewriter = new CSVWriter(new FileWriter(successFilePath));
+				failureFilewriter = new CSVWriter(new FileWriter(failureFilePath));
+
+				// Read the header from the input CSV and add a new column for "Status"
+				String[] header = reader.readNext();
+				String[] newHeader = addColumn(header, "Status");
+
+				// write headers
+				successFilewriter.writeNext(newHeader);
+				failureFilewriter.writeNext(newHeader);
+
+				String[] nextLine;
+				while ((nextLine = reader.readNext()) != null) {
+					String[] row = nextLine;
+					// final String[] row = nextLine;
+					// executorService.submit(() -> {
+
+					String[] processedRow = processRow(row);
+
+					if (processedRow != null && processedRow.length > header.length) {
+						String status = processedRow[header.length];
+
+						if ("Success".equalsIgnoreCase(status)) {
+							successFilewriter.writeNext(processedRow);
+						} else if ("failure".equalsIgnoreCase(status)) {
+							failureFilewriter.writeNext(processedRow);
+							hasAnyFailures = true;
+						}
+					}
+					// });
+				}
+
+				// executorService.shutdown();
+				// executorService.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+
+			} catch (IOException | CsvValidationException e) {
+				e.printStackTrace();
+			} finally {
+				if (reader != null) {
+
+					try {
+						reader.close();
+						Files.move(Paths.get(csvFile.getAbsolutePath()),
+								Paths.get(SOURCE_CSV_LOC + "/" + ARCHIVE_CSV_LOC_NAME + "/" + csvFile.getName()),
+								StandardCopyOption.REPLACE_EXISTING);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+				if (failureFilewriter != null) {
+					try {
+						failureFilewriter.close();
+						if (!hasAnyFailures) {
+							new File(failureFilePath).delete();
+						}
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+				if (successFilewriter != null) {
+					try {
+						successFilewriter.close();
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+				}
+			}
+
+		}
+		System.out.println("Report Generation Ended at " + dateFormat.format(new Date()));
+		long endTime = System.currentTimeMillis();
+		long duration = endTime - startTime;
+		String hms = String.format("%02d:%02d:%02d", TimeUnit.MILLISECONDS.toHours(duration),
+				TimeUnit.MILLISECONDS.toMinutes(duration) % TimeUnit.HOURS.toMinutes(1),
+				TimeUnit.MILLISECONDS.toSeconds(duration) % TimeUnit.MINUTES.toSeconds(1));
+		System.out.println("Report Generation Duration : " + hms);
+
+	}
+
+	private static String[] addColumn(String[] row, String columnName) {
+		String[] newRow = new String[row.length + 1];
+		System.arraycopy(row, 0, newRow, 0, row.length);
+		newRow[row.length] = columnName;
+		return newRow;
+	}
+
+	private static String[] processRow(String[] row) {
+		// Process the row here and return the modified row with the "Status" column
+		String status = "Success"; // Replace with your logic to determine the status
+		return addColumn(row, status);
+	}
+
+	private static File[] getCSVReports(String sourceLoc) {
+		File folder = new File(sourceLoc);
+
+		FilenameFilter csvFilter = new FilenameFilter() {
+			@Override
+			public boolean accept(File dir, String name) {
+				return name.endsWith(".csv");
+			}
+		};
+		File[] csvFiles = folder.listFiles(csvFilter);
+
+		Arrays.sort(csvFiles, new Comparator<File>() {
+
+			@Override
+			public int compare(File file1, File file2) {
+				return Long.compare(file1.lastModified(), file2.lastModified());
+			}
+		});
+		return csvFiles;
+	}
 }
