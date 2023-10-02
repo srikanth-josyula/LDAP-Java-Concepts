@@ -25,7 +25,11 @@ public class UpdateDocDescScheduledJobExecuter {
 
     private static final Logger logger = LoggerFactory.getLogger(UpdateDocDescScheduledJobExecuter.class);
 
-    // ... (other constants and fields)
+    public static final String NAMESPACE_JH_CONTENT_MODEL = "http://www.alfresco.org/model/johnhancock/1.0";
+    public static final QName PROP_JH_DOCUMENT_DESCRIPTION = QName.createQName(NAMESPACE_JH_CONTENT_MODEL, "documentDescription");
+
+    private ServiceRegistry serviceRegistry;
+    private CSVProcessor updateDocDescCSVProcessor;
 
     public void execute() {
         logger.info("Running the Update Document Description Scheduled Job Executer");
@@ -70,7 +74,21 @@ public class UpdateDocDescScheduledJobExecuter {
                     } catch (IOException | CsvValidationException e) {
                         logger.error("Error processing CSV file: " + e.getMessage(), e);
                     } finally {
-                        // ... (rest of the code)
+                        try {
+                            Files.move(Paths.get(csvFile.getAbsolutePath()),
+                                    Paths.get(updateDocDescCSVProcessor.getSOURCE_CSV_LOC() + File.separator
+                                            + CommonConstants.ARCHIVE_CSV_LOC_NAME + "/" + csvFile.getName()),
+                                    StandardCopyOption.REPLACE_EXISTING);
+                        } catch (IOException e) {
+                            logger.error("Error moving CSV file to archive: " + e.getMessage(), e);
+                        }
+                        if (!hasAnyFailures) {
+                            try {
+                                Files.deleteIfExists(Paths.get(failureFilePath));
+                            } catch (IOException e) {
+                                logger.error("Error deleting failure file: " + e.getMessage(), e);
+                            }
+                        }
                     }
                     // Adding a sleep time for 10 seconds
                     Thread.sleep(10000);
@@ -99,6 +117,54 @@ public class UpdateDocDescScheduledJobExecuter {
         }
     }
 
-    // ... (rest of the code)
+    private String[] addColumn(String[] row, String columnName) {
+        String[] newRow = new String[row.length + 1];
+        System.arraycopy(row, 0, newRow, 0, row.length);
+        newRow[row.length] = columnName;
+        return newRow;
+    }
 
+    private String[] processRow(String[] row) {
+        // Implement your row processing logic, making sure it is thread-safe
+        String status = null;
+
+        if (row.length >= 2) {
+
+            try {
+                String nodeId = row[0].trim();
+                String nodeDescription = row[1].trim();
+
+                NodeService nodeService = serviceRegistry.getNodeService();
+                StoreRef storeRef = new StoreRef(StoreRef.PROTOCOL_WORKSPACE, "SpacesStore");
+
+                NodeRef nodeRef = new NodeRef(storeRef, nodeId);
+
+                if (nodeService.exists(nodeRef)) {
+                    nodeService.setProperty(nodeRef, PROP_JH_DOCUMENT_DESCRIPTION, nodeDescription);
+                    logger.debug("Node " + nodeId + "updated successfully ");
+                    status = "Success";
+                } else {
+                    status = "Error:: Node not found";
+                    logger.error("Error updating the node :: Node not found: " + nodeId);
+                }
+            } catch (Exception e) {
+                status = "Error:: Error Updating Node ID";
+                logger.error("Error updating the node ::  " + e.getMessage());
+                e.printStackTrace();
+            }
+
+        } else {
+            status = "Error:: Invalid CSV Row";
+            logger.error("Invalid CSV row: " + row);
+        }
+        return addColumn(row, status);
+    }
+
+    public void setServiceRegistry(ServiceRegistry serviceRegistry) {
+        this.serviceRegistry = serviceRegistry;
+    }
+
+    public void setUpdateDocDescCSVProcessor(CSVProcessor updateDocDescCSVProcessor) {
+        this.updateDocDescCSVProcessor = updateDocDescCSVProcessor;
+    }
 }
