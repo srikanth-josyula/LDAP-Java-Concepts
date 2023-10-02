@@ -1,124 +1,104 @@
-package com.testing;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import java.io.*;
+import java.io.File;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
-import java.text.SimpleDateFormat;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Date;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+
+import org.alfresco.service.ServiceRegistry;
+import org.alfresco.service.cmr.repository.NodeRef;
+import org.alfresco.service.cmr.repository.NodeService;
+import org.alfresco.service.cmr.repository.StoreRef;
+import org.alfresco.service.namespace.QName;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.opencsv.CSVReader;
 import com.opencsv.CSVWriter;
 import com.opencsv.exceptions.CsvValidationException;
 
-public class ParallelCSVProcessing {
-    private static final Logger logger = LoggerFactory.getLogger(ParallelCSVProcessing.class);
+public class UpdateDocDescScheduledJobExecuter {
 
-    private static final String SOURCE_CSV_LOC = "C:/Application/Utilities/EK-7424-EDGE-EFS/reports";
-    private static final String ARCHIVE_CSV_LOC_NAME = "archive";
-    private static final String SUCCESS_CSV_LOC_NAME = "success";
-    private static final String ERROR_CSV_LOC_NAME = "error";
-    private static final String CSV_EXTENSION = ".csv";
+    private static final Logger logger = LoggerFactory.getLogger(UpdateDocDescScheduledJobExecuter.class);
 
-    public static void main(String[] args) {
-        long startTime = System.currentTimeMillis();
-        SimpleDateFormat dateFormat = new SimpleDateFormat("E yyyy.MM.dd 'at' hh:mm:ss a zzz");
-        logger.info("Report Generation Started at {}", dateFormat.format(new Date()));
+    // ... (other constants and fields)
 
-        File[] csvFiles = getCSVReports(SOURCE_CSV_LOC);
-        int numFilestoPick = Math.min(2, csvFiles.length);
+    public void execute() {
+        logger.info("Running the Update Document Description Scheduled Job Executer");
+        try {
+            File[] csvFiles = updateDocDescCSVProcessor.getCSVReports();
 
-        for (int i = csvFiles.length - 1; i >= csvFiles.length - numFilestoPick; i--) {
-            boolean hasAnyFailures = false;
-            File csvFile = csvFiles[i];
-            String inputFilePath = csvFile.getAbsolutePath();
+            if (csvFiles.length > 0) {
+                int numFilestoPick = Math.min(1, csvFiles.length);
+                for (int i = csvFiles.length - 1; i >= csvFiles.length - numFilestoPick; i--) {
+                    boolean hasAnyFailures = false;
+                    File csvFile = csvFiles[i];
+                    String inputFilePath = csvFile.getAbsolutePath();
 
-            String successFilePath = SOURCE_CSV_LOC + "/" + SUCCESS_CSV_LOC_NAME + "/" + csvFile.getName();
-            String failureFilePath = SOURCE_CSV_LOC + "/" + ERROR_CSV_LOC_NAME + "/" + csvFile.getName();
+                    String successFilePath = updateDocDescCSVProcessor.getSOURCE_CSV_LOC() + "/"
+                            + CommonConstants.SUCCESS_CSV_LOC_NAME + "/" + csvFile.getName();
+                    String failureFilePath = updateDocDescCSVProcessor.getSOURCE_CSV_LOC() + "/"
+                            + CommonConstants.ERROR_CSV_LOC_NAME + "/" + csvFile.getName();
 
-            try (CSVReader reader = new CSVReader(new FileReader(inputFilePath));
-                 CSVWriter successFilewriter = new CSVWriter(new FileWriter(successFilePath));
-                 CSVWriter failureFilewriter = new CSVWriter(new FileWriter(failureFilePath))) {
+                    try (CSVReader reader = new CSVReader(new FileReader(inputFilePath));
+                            CSVWriter successFilewriter = new CSVWriter(new FileWriter(successFilePath));
+                            CSVWriter failureFilewriter = new CSVWriter(new FileWriter(failureFilePath))) {
 
-                String[] header = reader.readNext();
-                String[] newHeader = addColumn(header, "Status");
+                        String[] header = reader.readNext();
+                        String[] newHeader = addColumn(header, "Status");
 
-                successFilewriter.writeNext(newHeader);
-                failureFilewriter.writeNext(newHeader);
+                        successFilewriter.writeNext(newHeader);
+                        failureFilewriter.writeNext(newHeader);
 
-                String[] nextLine;
-                while ((nextLine = reader.readNext()) != null) {
-                    String[] row = nextLine;
-                    String[] processedRow = processRow(row);
+                        String[] nextLine;
+                        ExecutorService executor = Executors.newFixedThreadPool(4); // Adjust the number of threads as needed
+                        while ((nextLine = reader.readNext()) != null) {
+                            String[] row = nextLine;
 
-                    if (processedRow != null && processedRow.length > header.length) {
-                        String status = processedRow[header.length];
+                            // Process each row in a separate thread
+                            executor.submit(() -> processAndWriteRow(row, header, successFilewriter, failureFilewriter));
 
-                        if ("Success".equalsIgnoreCase(status)) {
-                            successFilewriter.writeNext(processedRow);
-                        } else if ("Failure".equalsIgnoreCase(status)) {
-                            failureFilewriter.writeNext(processedRow);
-                            hasAnyFailures = true;
+                            // Wait for half a second before moving to the next job
+                            Thread.sleep(100);
                         }
+                        executor.shutdown();
+                        executor.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+                    } catch (IOException | CsvValidationException e) {
+                        logger.error("Error processing CSV file: " + e.getMessage(), e);
+                    } finally {
+                        // ... (rest of the code)
                     }
+                    // Adding a sleep time for 10 seconds
+                    Thread.sleep(10000);
                 }
-            } catch (IOException | CsvValidationException e) {
-                logger.error("Error processing CSV file: {}", e.getMessage(), e);
-            } finally {
-                try {
-                    Files.move(Paths.get(csvFile.getAbsolutePath()),
-                            Paths.get(SOURCE_CSV_LOC + "/" + ARCHIVE_CSV_LOC_NAME + "/" + csvFile.getName()),
-                            StandardCopyOption.REPLACE_EXISTING);
-                } catch (IOException e) {
-                    logger.error("Error moving CSV file to archive: {}", e.getMessage(), e);
-                }
-                if (!hasAnyFailures) {
-                    try {
-                        Files.deleteIfExists(Paths.get(failureFilePath));
-                    } catch (IOException e) {
-                        logger.error("Error deleting failure file: {}", e.getMessage(), e);
-                    }
-                }
+            } else {
+                logger.info("No document found under " + updateDocDescCSVProcessor.getSOURCE_CSV_LOC()
+                        + " for Update Document Description Stateful JobScheduler");
+            }
+        } catch (Exception e) {
+            logger.error("Error while processing the csv batches: " + e.getMessage(), e);
+        }
+    }
+
+    private void processAndWriteRow(String[] row, String[] header, CSVWriter successFilewriter,
+            CSVWriter failureFilewriter) {
+        String[] processedRow = processRow(row);
+
+        if (processedRow != null && processedRow.length > header.length) {
+            String status = processedRow[header.length];
+
+            if ("Success".equalsIgnoreCase(status)) {
+                successFilewriter.writeNext(processedRow);
+            } else {
+                failureFilewriter.writeNext(processedRow);
             }
         }
-
-        logger.info("Report Generation Ended at {}", dateFormat.format(new Date()));
-        long endTime = System.currentTimeMillis();
-        long duration = endTime - startTime;
-        String hms = String.format("%02d:%02d:%02d", TimeUnit.MILLISECONDS.toHours(duration),
-                TimeUnit.MILLISECONDS.toMinutes(duration) % TimeUnit.HOURS.toMinutes(1),
-                TimeUnit.MILLISECONDS.toSeconds(duration) % TimeUnit.MINUTES.toSeconds(1));
-        logger.info("Report Generation Duration: {}", hms);
     }
 
-    private static String[] addColumn(String[] row, String columnName) {
-        String[] newRow = Arrays.copyOf(row, row.length + 1);
-        newRow[row.length] = columnName;
-        return newRow;
-    }
+    // ... (rest of the code)
 
-    private static String[] processRow(String[] row) {
-        // Process the row here and return the modified row with the "Status" column
-        String status = "Success"; // Replace with your logic to determine the status
-        return addColumn(row, status);
-    }
-
-    private static File[] getCSVReports(String sourceLoc) {
-        File folder = new File(sourceLoc);
-
-        FilenameFilter csvFilter = (dir, name) -> name.endsWith(CSV_EXTENSION);
-        File[] csvFiles = folder.listFiles(csvFilter);
-
-        if (csvFiles != null) {
-            Arrays.sort(csvFiles, Comparator.comparingLong(File::lastModified));
-        }
-
-        return csvFiles != null ? csvFiles : new File[0];
-    }
 }
